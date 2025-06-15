@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Interactive Citi Bank Dashboard with 3D visualizations">
+  <title>Citi Bank - Interactive Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      margin-top: 0;
+    }
+
+    /* Animated Background */
+    .animated-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      background: linear-gradient(-45deg, #667eea, #764ba2, #ff6b6b, #4ecdc4);
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .floating-particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      animation: float 20s infinite linear;
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(100vh) rotate(0deg);
+        opacity: 0;
+      }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% {
+        transform: translateY(-100px) rotate(360deg);
+        opacity: 0;
+      }
+    }
+
+    /* NAVBAR STYLES */
+    .navbar {
+      background: rgba(0, 59, 113, 0.95);
+      backdrop-filter: blur(20px);
+      padding: 1rem;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .navbar.scrolled {
+      background: rgba(0, 59, 113, 0.98);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      transform: translateY(0);
+    }
+
+    .navbar.hidden {
+      transform: translateY(-100%);
+    }
+
+    .nav-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: white;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo::before {
+      content: "🏦";
+      font-size: 2rem;
+      animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-10px); }
+      60% { transform: translateY(-5px); }
+    }
+
+    .menu-toggle {
+      display: none;
+      font-size: 1.8rem;
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      padding: 0.5rem;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .menu-toggle:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: rotate(90deg);
+    }
+
+    .nav-links {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      list-style: none;
+      gap: 1rem;
+    }
+
+    .nav-links li {
+      position: relative;
+    }
+
+    .nav-links a {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: white;
+      text-decoration: none;
+      padding: 1rem;
+      border-radius: 12px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      font-size: 0.9rem;
+    }
+
+    .nav-links a::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .nav-links a:hover::before {
+      left: 100%;
+    }
+
+    .nav-links a:hover,
+    .nav-links a.active {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .nav-links a.active {
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+    }
+
+    .nav-icon {
+      width: 28px;
+      height: 28px;
+      margin-bottom: 0.5rem;
+      transition: all 0.3s ease;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    }
+
+    .nav-links a:hover .nav-icon {
+      transform: rotate(360deg) scale(1.2);
+    }
+
+    /* Mobile Styles */
+    @media (max-width: 768px) {
+      .menu-toggle {
+        display: block;
+      }
+
+      .nav-links {
+        display: none;
+        flex-direction: column;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(0, 59, 113, 0.98);
+        backdrop-filter: blur(20px);
+        border-radius: 0 0 15px 15px;
+        padding: 1rem;
+        gap: 0.5rem;
+      }
+
+      .nav-links.show {
+        display: flex;
+        animation: slideDown 0.3s ease-out;
+      }
+
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .nav-links a {
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 1rem;
+        width: 100%;
+      }
+    }
+
+    /* MAIN CONTENT */
+    .dashboard {
+      padding: 2rem;
+      margin-top: 100px;
+      max-width: 1400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .welcome-section {
+      text-align: center;
+      margin-bottom: 3rem;
+      animation: fadeInUp 1s ease-out;
+    }
+
+    .welcome-section h1 {
+      color: white;
+      font-size: 3rem;
+      font-weight: 300;
+      margin-bottom: 1rem;
+      text-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    .welcome-section h1::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, white, transparent);
+      animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow {
+      from { box-shadow: 0 0 5px rgba(255,255,255,0.5); }
+      to { box-shadow: 0 0 20px rgba(255,255,255,0.8); }
+    }
+
+    .welcome-section p {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+    }
+
+    .user-avatar {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      margin: 0 auto 2rem;
+      background: linear-gradient(45deg, #667eea, #764ba2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .user-avatar::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+      transform: rotate(45deg);
+      transition: all 0.3s ease;
+      opacity: 0;
+    }
+
+    .user-avatar:hover::before {
+      opacity: 1;
+      animation: shimmer 1s ease-in-out;
+    }
+
+    @keyframes shimmer {
+      from { transform: translateX(-200%) rotate(45deg); }
+      to { transform: translateX(200%) rotate(45deg); }
+    }
+
+    .user-avatar:hover {
+      transform: scale(1.1) rotate(5deg);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Dashboard Cards */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .dashboard-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 2rem;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      animation: slideInUp 0.6s ease-out forwards;
+      opacity: 0;
+      transform: translateY(30px);
+    }
+
+    .dashboard-card:nth-child(1) { animation-delay: 0.1s; }
+    .dashboard-card:nth-child(2) { animation-delay: 0.2s; }
+    .dashboard-card:nth-child(3) { animation-delay: 0.3s; }
+    .dashboard-card:nth-child(4) { animation-delay: 0.4s; }
+
+    @keyframes slideInUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .dashboard-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #667eea, #764ba2, #ff6b6b);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+
+    .dashboard-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .dashboard-card:hover {
+      transform: translateY(-10px) scale(1.02);
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .card-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      display: block;
+      animation: pulse 2s infinite;
+    }
+
+    .card-title {
+      color: white;
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+      font-weight: 500;
+    }
+
+    .card-content {
+      color: rgba(255, 255, 255, 0.8);
+      line-height: 1.6;
+    }
+
+    /* Three.js Container */
+    .three-container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 2rem;
+      margin: 2rem 0;
+      height: 500px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .three-container h2 {
+      color: white;
+      margin-bottom: 1rem;
+      font-weight: 300;
+      text-align: center;
+    }
+
+    #threeCanvas {
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 15px;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .control-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 1rem;
+      backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .control-btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: all 0.3s ease;
+    }
+
+    .control-btn:hover::before {
+      width: 200px;
+      height: 200px;
+    }
+
+    .control-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-3px);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .control-btn.active {
+      background: rgba(0, 59, 113, 0.8);
+      box-shadow: 0 0 25px rgba(0, 59, 113, 0.6);
+    }
+
+    /* Interactive Stats */
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .stat-item {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(15px);
+      border-radius: 15px;
+      padding: 1.5rem;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .stat-item:hover {
+      transform: scale(1.05);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: white;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 0.9rem;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 2rem;
+      max-width: 600px;
+      width: 90%;
+      color: white;
+      text-align: center;
+      transform: scale(0.8);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .modal.show .modal-content {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    .close-modal {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      padding: 0.8rem 1.5rem;
+      border-radius: 25px;
+      cursor: pointer;
+      margin-top: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .close-modal:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .nav-links {
+        gap: 1rem;
+      }
+      
+      .nav-links a {
+        padding: 0.5rem;
+      }
+      
+      .cards {
+        grid-template-columns: 1fr;
+      }
+      
+      #welcomeMsg {
+        font-size: 2rem;
+      }
+      
+      .user-info {
+        flex-direction: column;
+      }
+    }
+
+    /* Phone (Small devices) */
+    @media (max-width: 480px) {
+      .navbar {
+        padding: 0.5rem;
+      }
+
+      .nav-container {
+        width: 100%;
+      }
+
+      .nav-links {
+        gap: 0.5rem;
+        justify-content: space-between;
+        width: 100%;
+      }
+
+      .nav-links a {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+      }
+
+      .nav-icon {
+        width: 20px;
+        height: 20px;
+      }
+
+      .header {
+        margin-top: 80px;
+        padding: 1rem;
+      }
+
+      .profile-pic {
+        width: 60px;
+        height: 60px;
+      }
+
+      #welcomeMsg {
+        font-size: 1.5rem;
+      }
+
+      .dashboard {
+        padding: 1rem;
+      }
+
+      .card {
+        padding: 1rem;
+      }
+
+      .card h2 {
+        font-size: 1rem;
+      }
+
+      .card p {
+        font-size: 1.5rem;
+      }
+
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .control-btn {
+        width: 100%;
+        margin: 0.5rem 0;
+      }
+
+      .chart-section, .three-container {
+        padding: 1rem;
+      }
+
+      .modal-content {
+        width: 95%;
+        padding: 1rem;
+      }
+    }
+
+    /* Tablet */
+    @media (min-width: 481px) and (max-width: 768px) {
+      .nav-links {
+        gap: 1rem;
+      }
+
+      .cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .chart-section, .three-container {
+        height: 300px;
+      }
+    }
+
+    /* iPad */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .chart-section, .three-container {
+        height: 350px;
+      }
+
+      .nav-links {
+        gap: 1.5rem;
+      }
+    }
+
+    /* Desktop */
+    @media (min-width: 1025px) {
+      .dashboard {
+        max-width: 1400px;
+      }
+
+      .cards {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .chart-section, .three-container {
+        height: 400px;
+      }
+
+      .nav-links {
+        gap: 2rem;
+      }
+    }
+
+    /* Large Desktop */
+    @media (min-width: 1441px) {
+      .dashboard {
+        max-width: 1800px;
+      }
+
+      .cards {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 3rem;
+      }
+
+      .chart-section, .three-container {
+        height: 500px;
+      }
+    }
+
+    /* Landscape Mode */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .header {
+        margin-top: 60px;
+      }
+
+      .user-info {
+        flex-direction: row;
+      }
+
+      .chart-section, .three-container {
+        height: 250px;
+      }
+    }
+
+    /* Dark Mode Support */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.05);
+      }
+    }
+
+    /* Print Styles */
+    @media print {
+      .navbar, .controls, .footer {
+        display: none;
+      }
+
+      body {
+        background: white;
+      }
+
+      .card {
+        break-inside: avoid;
+        border: 1px solid #ccc;
+        background: white;
+        color: black;
+      }
+
+      .chart-section, .three-container {
+        break-inside: avoid;
+        border: 1px solid #ccc;
+        background: white;
+      }
+    }
+
+    /* Update maintenance banner styles */
+    .maintenance-banner {
+      background: linear-gradient(90deg, #ff6b6b, #ff8e8e);
+      color: white;
+      text-align: center;
+      padding: 0.8rem;
+      font-size: 0.9rem;
+      position: relative;
+      z-index: 1001;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      animation: slideDown 0.5s ease-out;
+      transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+    }
+
+    .maintenance-banner.hide {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+
+    .maintenance-banner p {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .maintenance-banner .icon {
+      font-size: 1.2rem;
+    }
+
+    /* Add back to top button styles */
+    .back-to-top {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: rgba(0, 59, 113, 0.9);
+      color: white;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+      z-index: 999;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .back-to-top.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .back-to-top:hover {
+      transform: translateY(-5px);
+      background: rgba(0, 59, 113, 1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .back-to-top:active {
+      transform: translateY(0);
+    }
+
+    .footer {
+      width:100%;
+      font-weight: 500;
+      text-align: center;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="maintenance-banner">
+    <p>
+      <span class="icon">⚠️</span>
+      Our website is temporarily under migration and maintenance. We apologize for any inconvenience you may experience.
+    </p>
+  </div>
+  <div class="animated-bg"></div>
+  <div class="floating-particles" id="particles"></div>
+
+  <!-- Responsive Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="#" class="logo">CITI</a>
+      <button class="menu-toggle" onclick="toggleMenu()" aria-label="Toggle navigation">
+        ☰
+      </button>
+      <ul class="nav-links" id="navLinks">
+        <li>
+          <a href="dashboard.html" class="active" onclick="showSection('dashboard')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+            </svg>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="transactions.html" onclick="showSection('transactions')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+            </svg>
+            <span>Transactions</span>
+          </a>
+        </li>
+        <li>
+          <a href="transfers.html" onclick="showSection('transfer')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M14,12L10,8V11H2V13H10V16M20,18V6C20,4.89 19.1,4 18,4H6A2,2 0 0,0 4,6V9H6V6H18V18H6V15H4V18A2,2 0 0,0 6,20H18A2,2 0 0,0 20,18Z"/>
+            </svg>
+            <span>Transfer</span>
+          </a>
+        </li>
+        <li>
+          <a href="settings.html" onclick="showSection('settings')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+            </svg>
+            <span>Settings</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Main Dashboard Section -->
+  <main class="dashboard">
+    <section class="welcome-section">
+      <div class="user-avatar" onclick="showProfileModal()">👨‍💼</div>
+      <h1>Welcome, Michael Wright</h1>
+      <p>Good day, Mr Wright. Your financial universe awaits.</p>
+    </section>
+
+    <!-- Interactive Stats -->
+    <div class="stats-container">
+      <div class="stat-item" onclick="animateBalance()">
+        <div class="stat-number" id="balance">$0</div>
+        <div class="stat-label">Account Balance</div>
+      </div>
+      <div class="stat-item" onclick="showCreditInfo()">
+        <div class="stat-number">95%</div>
+        <div class="stat-label">Credit Score</div>
+      </div>
+      <div class="stat-item" onclick="showInvestments()">
+        <div class="stat-number" id="investments">$0</div>
+        <div class="stat-label">Investments</div>
+      </div>
+      <div class="stat-item" onclick="showSavings()">
+        <div class="stat-number" id="savings">$0</div>
+        <div class="stat-label">Savings Goal</div>
+      </div>
+    </div>
+
+    <!-- Dashboard Cards -->
+    <div class="dashboard-grid">
+      <div class="dashboard-card" onclick="showAccountDetails()">
+        <span class="card-icon">💰</span>
+        <h3 class="card-title">Account Overview</h3>
+        <div class="card-content">
+          <p>Manage your checking and savings accounts with real-time balance updates and transaction history.</p>
+        </div>
+      </div>
+
+      <div class="dashboard-card" onclick="showTransactionHistory()">
+        <span class="card-icon">📊</span>
+        <h3 class="card-title">Transaction Analytics</h3>
+        <div class="card-content">
+          <p>Analyze your spending patterns with interactive charts and detailed categorization.</p>
+        </div>
+      </div>
+
+      <div class="dashboard-card" onclick="showQuickTransfer()">
+        <span class="card-icon">🚀</span>
+        <h3 class="card-title">Quick Transfer</h3>
+        <div class="card-content">
+          <p>Send money instantly to contacts with our secure and fast transfer system.</p>
+        </div>
+      </div>
+
+      <div class="dashboard-card" onclick="showBillPay()">
+        <span class="card-icon">💳</span>
+        <h3 class="card-title">Bill Management</h3>
+        <div class="card-content">
+          <p>Schedule and manage all your bills in one place with automated payment options.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Controls -->
+    <!-- <div class="controls">
+      <button class="control-btn active" onclick="toggleVisualization('3d')">🎯 3D View</button>
+      <button class="control-btn" onclick="toggleVisualization('stats')">📈 Statistics</button>
+      <button class="control-btn" onclick="animateAll()">✨ Animate All</button>
+      <button class="control-btn" onclick="toggleTheme()">🌙 Theme</button>
+      <button class="control-btn" onclick="exportData()">💾 Export</button>
+    </div> -->
+
+    <!-- Three.js Visualization
+    <section class="three-container" id="threeContainer">
+      <h2>🎯 3D Financial Visualization</h2>
+      <canvas id="threeCanvas"></canvas>
+    </section> -->
+    <footer class="footer">
+      <p>&copy; 2023 CITI Bank. All rights reserved.</p>
+    </footer>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal" id="modal">
+    <div class="modal-content">
+      <h2 id="modalTitle">Modal Title</h2>
+      <div id="modalContent">Modal content goes here</div>
+      <button class="close-modal" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- Add the button HTML before the closing body tag -->
+  <button class="back-to-top" onclick="scrollToTop()" aria-label="Back to top">
+    ↑
+  </button>
+
+  <script>
+    // Global variables
+    let scene, camera, renderer, cubes = [], animationId;
+    let currentTheme = 'dark';
+    let lastScrollY = 0;
+    let balanceTarget = 47850;
+    let investmentsTarget = 23400;
+    let savingsTarget = 15600;
+
+    // Initialize everything
+    document.addEventListener('DOMContentLoaded', function() {
+      initParticles();
+      initThreeJS();
+      initScrollEffects();
+      animateCounters();
+      startRealTimeUpdates();
+      const banner = document.querySelector('.maintenance-banner');
+      
+      // Hide banner after 5 seconds
+      setTimeout(() => {
+        banner.classList.add('hide');
+        // Remove banner from DOM after animation completes
+        setTimeout(() => {
+          banner.remove();
+        }, 500);
+      }, 5000);
+    });
+
+    // Create floating particles
+    function initParticles() {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 30; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.animationDelay = Math.random() * 20 + 's';
+        particle.style.animationDuration = (Math.random() * 15 + 10) + 's';
+        container.appendChild(particle);
+      }
+    }
+
+    // Three.js initialization
+    function initThreeJS() {
+      const container = document.getElementById('threeCanvas');
+      
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+      renderer = new THREE.WebGLRenderer({ canvas: container, alpha: true, antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setClearColor(0x000000, 0);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      // Create 3D cubes representing financial data
+      const geometry = new THREE.BoxGeometry(1, 1, 1);
+      const colors = [0x667eea, 0x764ba2, 0xff6b6b, 0x4ecdc4, 0x45b7d1, 0x96ceb4];
+      
+      for (let i = 0; i < 12; i++) {
+        const material = new THREE.MeshPhongMaterial({ 
+          color: colors[i % colors.length],
+          transparent: true,
+          opacity: 0.8
+        });
+        const cube = new THREE.Mesh(geometry, material);
+        
+        cube.position.x = (i % 4 - 1.5) * 2;
+        cube.position.y = Math.floor(i / 4) * 2 - 1;
+        cube.position.z = 0;
+        cube.rotation.x = Math.random() * Math.PI;
+        cube.rotation.y = Math.random() * Math.PI;
+        
+        scene.add(cube);
+        cubes.push(cube);
+      }
+
+      // Add lighting
+      const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(10, 10, 5);
+      directionalLight.castShadow = true;
+      scene.add(directionalLight);
+
+      const pointLight = new THREE.PointLight(0x667eea, 1, 100);
+      pointLight.position.set(0, 0, 10);
+      scene.add(pointLight);
+
+      camera.position.z = 8;
+
+      // Mouse interaction
+      let mouseX = 0, mouseY = 0;
+      container.addEventListener('mousemove', (event) => {
+        const rect = container.getBoundingClientRect();
+        mouseX = (event.clientX - rect.left) / rect.width * 2 - 1;
+        mouseY = -(event.clientY - rect.top) / rect.height * 2 + 1;
+      });
+
+      // Animation loop
+      function animate() {
+        animationId = requestAnimationFrame(animate);
+
+        // Update cube rotations
+        cubes.forEach((cube, index) => {
+          cube.rotation.x += 0.01 + index * 0.001;
+          cube.rotation.y += 0.01 + index * 0.001;
+          cube.position.y += Math.sin(Date.now() * 0.001 + index) * 0.005;
+        });
+
+        // Camera movement based on mouse
+        camera.position.x += (mouseX * 2 - camera.position.x) * 0.05;
+        camera.position.y += (mouseY * 2 - camera.position.y) * 0.05;
+        camera.lookAt(scene.position);
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      // Handle window resize
+      window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+    }
+
+    // Scroll effects
+    function initScrollEffects() {
+      window.addEventListener('scroll', () => {
+        const currentScrollY = window.scrollY;
+        const navbar = document.getElementById('navbar');
+        
+        if (currentScrollY > 100) {
+          navbar.classList.add('scrolled');
+        } else {
+          navbar.classList.remove('scrolled');
+        }
+
+        if (currentScrollY > lastScrollY && currentScrollY > 200) {
+          navbar.classList.add('hidden');
+        } else {
+          navbar.classList.remove('hidden');
+        }
+
+        lastScrollY = currentScrollY;
+      });
+    }
+
+    // Animate counters
+    function animateCounters() {
+      animateValue('balance', 0, balanceTarget, 2000, true);
+      animateValue('investments', 0, investmentsTarget, 2500, true);
+      animateValue('savings', 0, savingsTarget, 1800, true);
+    }
+
+    function animateValue(id, start, end, duration, isCurrency = false) {
+      const element = document.getElementById(id);
+      const range = end - start;
+      const startTime = performance.now();
+
+      function updateValue(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+        const current = Math.floor(start + range * easeOutQuart);
+        
+        if (isCurrency) {
+          element.textContent = '$' + current.toLocaleString();
+        } else {
+          element.textContent = current.toLocaleString();
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(updateValue);
+        }
+      }
+
+      requestAnimationFrame(updateValue);
+    }
+
+    // Real-time updates simulation
+    function startRealTimeUpdates() {
+      setInterval(() => {
+        const variance = 50;
+        balanceTarget += (Math.random() - 0.5) * variance;
+        investmentsTarget += (Math.random() - 0.5) * variance * 0.5;
+        savingsTarget += (Math.random() - 0.5) * variance * 0.3;
+        
+        document.getElementById('balance').textContent = '$' + Math.floor(balanceTarget).toLocaleString();
+        document.getElementById('investments').textContent = '$' + Math.floor(investmentsTarget).toLocaleString();
+        document.getElementById('savings').textContent = '$' + Math.floor(savingsTarget).toLocaleString();
+      }, 5000);
+    }
+
+    // Navigation functions
+    function toggleMenu() {
+      const navLinks = document.getElementById('navLinks');
+      navLinks.classList.toggle('show');
+    }
+
+    function showSection(section) {
+      const navLinks = document.querySelectorAll('.nav-links a');
+      navLinks.forEach(link => link.classList.remove('active'));
+      event.target.closest('a').classList.add('active');
+      
+      // Close mobile menu
+      document.getElementById('navLinks').classList.remove('show');
+      
+      showModal('Navigation', `You selected: ${section.charAt(0).toUpperCase() + section.slice(1)}`);
+    }
+
+    // Modal functions
+    function showModal(title, content) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalContent').innerHTML = content;
+      const modal = document.getElementById('modal');
+      modal.style.display = 'flex';
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.style.display = 'none', 300);
+    }
+
+    // Click outside modal to close
+    document.getElementById('modal').addEventListener('click', (e) => {
+      if (e.target.id === 'modal') {
+        closeModal();
+      }
+    });
+
+    // Card click handlers
+    function showAccountDetails() {
+      showModal('Account Overview', `
+        <div style="text-align: left;">
+          <h3>Account Summary</h3>
+          <p><strong>Checking Account:</strong> ${(balanceTarget * 0.7).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</p>
+          <p><strong>Savings Account:</strong> ${(balanceTarget * 0.3).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</p>
+          <p><strong>Account Status:</strong> Active</p>
+          <p><strong>Last Activity:</strong> Today, 2:45 PM</p>
+          <hr style="margin: 1rem 0; border: 1px solid rgba(255,255,255,0.2);">
+          <h4>Recent Transactions</h4>
+          <p>• Coffee Shop - $4.25</p>
+          <p>• Gas Station - $45.60</p>
+          <p>• Grocery Store - $127.89</p>
+        </div>
+      `);
+    }
+
+    function showTransactionHistory() {
+      showModal('Transaction Analytics', `
+        <div style="text-align: left;">
+          <h3>Spending Analysis</h3>
+          <p><strong>This Month:</strong> $2,847.32</p>
+          <p><strong>Last Month:</strong> $3,124.18</p>
+          <p><strong>Average Monthly:</strong> $2,985.75</p>
+          <hr style="margin: 1rem 0; border: 1px solid rgba(255,255,255,0.2);">
+          <h4>Top Categories</h4>
+          <p>🏠 Housing - 35%</p>
+          <p>🍽️ Food & Dining - 22%</p>
+          <p>🚗 Transportation - 18%</p>
+          <p>🛍️ Shopping - 15%</p>
+          <p>💡 Utilities - 10%</p>
+        </div>
+      `);
+    }
+
+    function showQuickTransfer() {
+      showModal('Quick Transfer', `
+        <div style="text-align: left;">
+          <h3>Send Money</h3>
+          <input type="text" placeholder="Recipient" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white;">
+          <input type="number" placeholder="Amount" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white;">
+          <textarea placeholder="Message (optional)" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white; height: 60px;"></textarea>
+          <button style="width: 100%; padding: 12px; background: linear-gradient(45deg, #667eea, #764ba2); border: none; border-radius: 25px; color: white; font-size: 16px; cursor: pointer; margin-top: 10px;">Send Transfer</button>
+        </div>
+      `);
+    }
+
+    function showBillPay() {
+      showModal('Bill Management', `
+        <div style="text-align: left;">
+          <h3>Upcoming Bills</h3>
+          <div style="margin: 15px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+            <p><strong>Electric Bill</strong> - $89.34</p>
+            <p style="font-size: 0.9em; color: rgba(255,255,255,0.7);">Due: May 28, 2025</p>
+          </div>
+          <div style="margin: 15px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+            <p><strong>Internet Service</strong> - $65.99</p>
+            <p style="font-size: 0.9em; color: rgba(255,255,255,0.7);">Due: May 30, 2025</p>
+          </div>
+          <div style="margin: 15px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+            <p><strong>Phone Bill</strong> - $45.00</p>
+            <p style="font-size: 0.9em; color: rgba(255,255,255,0.7);">Due: June 2, 2025</p>
+          </div>
+          <button style="width: 100%; padding: 12px; background: linear-gradient(45deg, #667eea, #764ba2); border: none; border-radius: 25px; color: white; font-size: 16px; cursor: pointer; margin-top: 15px;">Pay All Bills</button>
+        </div>
+      `);
+    }
+
+    function showProfileModal() {
+      showModal('Profile Information', `
+        <div style="text-align: left;">
+          <h3>Michael Wright</h3>
+          <p><strong>Account Type:</strong> Premium</p>
+          <p><strong>Member Since:</strong> January 2018</p>
+          <p><strong>Customer ID:</strong> CW-789456123</p>
+          <p><strong>Contact:</strong> m.wright@email.com</p>
+          <p><strong>Phone:</strong> (555) 123-4567</p>
+          <hr style="margin: 1rem 0; border: 1px solid rgba(255,255,255,0.2);">
+          <h4>Account Benefits</h4>
+          <p>✅ No monthly fees</p>
+          <p>✅ Priority customer support</p>
+          <p>✅ Enhanced security features</p>
+          <p>✅ Investment advisory services</p>
+        </div>
+      `);
+    }
+
+    // Stats click handlers
+    function animateBalance() {
+      const element = document.getElementById('balance');
+      element.style.transform = 'scale(1.2)';
+      element.style.color = '#4ecdc4';
+      setTimeout(() => {
+        element.style.transform = 'scale(1)';
+        element.style.color = 'white';
+      }, 300);
+      
+      showModal('Account Balance Details', `
+        <div style="text-align: left;">
+          <h3>Balance Breakdown</h3>
+          <p><strong>Available Balance:</strong> ${(balanceTarget * 0.95).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</p>
+          <p><strong>Pending Transactions:</strong> -${(balanceTarget * 0.05).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</p>
+          <p><strong>Total Balance:</strong> ${balanceTarget.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</p>
+          <hr style="margin: 1rem 0; border: 1px solid rgba(255,255,255,0.2);">
+          <p><strong>Interest Earned This Month:</strong> ${(balanceTarget * 0.001).toFixed(2)}</p>
+          <p><strong>Annual Interest Rate:</strong> 1.25%</p>
+        </div>
+      `);
+    }
+
+    function showCreditInfo() {
+      showModal('Credit Score Information', `
+        <div style="text-align: left;">
+          <h3>Credit Score: 95%</h3>
+          <p><strong>Score Range:</strong> Excellent (781-850)</p>
+          <p><strong>Last Updated:</strong> May 15, 2025</p>
+          <p><strong>Change:</strong> +5 points this month</p>
+          <hr style="margin: 1rem 0; border: 1px solid rgba(255,255,255,0.2);">
+          <h4>Score Factors</h4>
+          <p>✅ Payment History - Excellent</p>
+          <p>✅ Credit Utilization - 12%</p>
+          <p>✅ Length of Credit History - 7 years</p>
+          <p>✅ Credit Mix - Good</p>
+          <p>⚠️ New Credit Inquiries - 1 recent</p>
+        </div>
+      `);
+    }
+
+    function showInvestments() {
+      showModal('Investment Portfolio', `
+        <div style="text-align: left;">
+          <h3>Portfolio Value: ${investmentsTarget.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</h3>
+          <p><strong>Today's Change:</strong> <span style="color: #4ecdc4;">+$127.45 (+0.54%)</span></p>
+          <hr style="margin: 1rem 0; border: 1px solid rgba(255,255,255,0.2);">
+          <h4>Holdings</h4>
+          <p>📈 Stocks - 65% (${(investmentsTarget * 0.65).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")})</p>
+          <p>🏛️ Bonds - 25% (${(investmentsTarget * 0.25).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")})</p>
+          <p>🌍 International - 10% (${(investmentsTarget * 0.10).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")})</p>
+          <hr style="margin: 1rem 0; border: 1px solid rgba(255,255,255,0.2);">
+          <p><strong>YTD Return:</strong> <span style="color: #4ecdc4;">+8.34%</span></p>
+        </div>
+      `);
+    }
+
+    function showSavings() {
+      showModal('Savings Goal Progress', `
+        <div style="text-align: left;">
+          <h3>Vacation Fund Goal</h3>
+          <p><strong>Current Amount:</strong> ${savingsTarget.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</p>
+          <p><strong>Target Amount:</strong> $20,000</p>
+          <p><strong>Progress:</strong> ${((savingsTarget / 20000) * 100).toFixed(1)}%</p>
+          <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; margin: 10px 0;">
+            <div style="background: linear-gradient(90deg, #4ecdc4, #45b7d1); height: 100%; width: ${(savingsTarget / 20000) * 100}%; border-radius: 5px;"></div>
+          </div>
+          <p><strong>Monthly Contribution:</strong> $500</p>
+          <p><strong>Estimated Completion:</strong> December 2025</p>
+          <hr style="margin: 1rem 0; border: 1px solid rgba(255,255,255,0.2);">
+          <button style="width: 100%; padding: 10px; background: linear-gradient(45deg, #4ecdc4, #45b7d1); border: none; border-radius: 20px; color: white; cursor: pointer;">Increase Contribution</button>
+        </div>
+      `);
+    }
+
+    // Control button handlers
+    function toggleVisualization(type) {
+      const buttons = document.querySelectorAll('.control-btn');
+      buttons.forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      if (type === '3d') {
+        document.getElementById('threeContainer').style.display = 'block';
+        cubes.forEach((cube, index) => {
+          cube.material.color.setHex([0x667eea, 0x764ba2, 0xff6b6b, 0x4ecdc4, 0x45b7d1, 0x96ceb4][index % 6]);
+        });
+      } else if (type === 'stats') {
+        showModal('Statistics View', `
+          <div style="text-align: left;">
+            <h3>Financial Statistics</h3>
+            <p><strong>Monthly Income:</strong> $6,750</p>
+            <p><strong>Monthly Expenses:</strong> $4,125</p>
+            <p><strong>Savings Rate:</strong> 38.9%</p>
+            <p><strong>Debt-to-Income Ratio:</strong> 12%</p>
+            <hr style="margin: 1rem 0; border: 1px solid rgba(255,255,255,0.2);">
+            <h4>Spending Trends</h4>
+            <p>📊 Housing costs decreased 5% this month</p>
+            <p>📊 Entertainment spending up 12%</p>
+            <p>📊 Food expenses remained stable</p>
+          </div>
+        `);
+      }
+    }
+
+    function animateAll() {
+      // Animate all stats
+      animateCounters();
+      
+      // Animate 3D cubes
+      cubes.forEach((cube, index) => {
+        cube.rotation.x += 0.5;
+        cube.rotation.y += 0.5;
+        cube.material.color.setHex(Math.random() * 0xffffff);
+        setTimeout(() => {
+          cube.material.color.setHex([0x667eea, 0x764ba2, 0xff6b6b, 0x4ecdc4, 0x45b7d1, 0x96ceb4][index % 6]);
+        }, 2000);
+      });
+
+      // Animate cards
+      const cards = document.querySelectorAll('.dashboard-card, .stat-item');
+      cards.forEach((card, index) => {
+        setTimeout(() => {
+          card.style.transform = 'scale(1.05) translateY(-10px)';
+          setTimeout(() => {
+            card.style.transform = '';
+          }, 300);
+        }, index * 100);
+      });
+    }
+
+    function toggleTheme() {
+      const body = document.body;
+      if (currentTheme === 'dark') {
+        body.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+        currentTheme = 'light';
+        event.target.textContent = '🌞 Light';
+      } else {
+        body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        currentTheme = 'dark';
+        event.target.textContent = '🌙 Theme';
+      }
+    }
+
+    function exportData() {
+      const data = {
+        balance: balanceTarget,
+        investments: investmentsTarget,
+        savings: savingsTarget,
+        timestamp: new Date().toISOString(),
+        user: 'Michael Wright'
+      };
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'citi_financial_data.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showModal('Data Export', 'Your financial data has been exported successfully!');
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+      if (e.key === 'r' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        animateAll();
+      }
+    });
+
+    // Performance monitoring
+    let fps = 0;
+    let lastTime = performance.now();
+    function trackPerformance() {
+      const now = performance.now();
+      fps = 1000 / (now - lastTime);
+      lastTime = now;
+      
+      if (fps < 30) {
+        console.warn('Low FPS detected:', fps.toFixed(1));
+      }
+      
+      requestAnimationFrame(trackPerformance);
+    }
+    trackPerformance();
+
+    // Add the JavaScript for back to top functionality
+    function scrollToTop() {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+
+    // Show/hide back to top button based on scroll position
+    window.addEventListener('scroll', function() {
+      const backToTopButton = document.querySelector('.back-to-top');
+      if (window.scrollY > 300) {
+        backToTopButton.classList.add('visible');
+      } else {
+        backToTopButton.classList.remove('visible');
+      }
+    });
+  </script>
+</body>
+</html>
